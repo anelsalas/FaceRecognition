@@ -16,6 +16,10 @@ import numpy
 import sys
 import platform
 import dlib
+import dlibFaceRecognition
+import pprint
+import face_recognition
+
 '''
 All these stupid globals are because there is no constructor available for 
 mmod_rectangle which is returned inside the mmod_rectangles object.
@@ -23,11 +27,23 @@ From the documentation:
    This detector (cnn_face_detector) returns a mmod_rectangles object. This object contains a list of mmod_rectangle objects.
    These objects can be accessed by simply iterating over the mmod_rectangles object
    The mmod_rectangle object has two member variables, a dlib.rectangle object, and a confidence score.
+
+   http://dlib.net/cnn_face_detector.py.html says:
+   "You can get the mmod_human_face_detector.dat file from:\n"
+   "    http://dlib.net/files/mmod_human_face_detector.dat.bz2"
 '''
 
 cnn_face_detector = dlib.cnn_face_detection_model_v1("mmod_human_face_detector1.dat")
 img = dlib.load_rgb_image("obama_small.jpg")
-mmod_rectangles = cnn_face_detector(img,1)
+mmod_rects = cnn_face_detector(img,1)
+mmod_singleRectangle = mmod_rects.pop()
+
+dlibFaceRecognition.ClearListOfDetectedFaces (mmod_rects)
+
+#geyguy face_recognition library globals
+known_face_encodings = []
+knon_face_metadata = []
+
 
 
 def GetVideoObject():
@@ -81,13 +97,19 @@ def CaptureVideo():
     net_model = ReadModel()
     video_capture = GetVideoObject()
   
-    while True:
+    while True: 
+        # process each frame
         ret, frame = video_capture.read()
         blob = GetBlobFromFrame(frame)
         mat_detections = ExtractDetectedFaces(blob,net_model)
         # for this to work with gey guy face_recognition, I need to return
         # a list of tuples of found face locations in css (top, right, bottom, left) order
-        IterateOverDetectedFaces (mat_detections,frame)
+        dlib_mmod_rects = IterateOverDetectedFaces (mat_detections,frame)
+        geyguyFaceLocations = dlibFaceRecognition.GeyGuyFormatedDetectedFaces(dlib_mmod_rects,frame)
+        dlib_face_encodings = dlibFaceRecognition.GeyGuyFaceEncodings(geyguyFaceLocations,frame)
+
+
+        #face_encodings = face_recognition.face_encodings(frame, detected_faces)
         # Display frame 
         cv2.imshow('Video', frame)
         # Hit 'q' on the keyboard to quit
@@ -97,6 +119,7 @@ def CaptureVideo():
 # The following functions are used by geyguy so I'm putting them as reference
 
 ###############################################################################
+'''
 def _rect_to_css(rect):
     """
     Convert a dlib 'rect' object to a plain tuple in (top, right, bottom, left) order
@@ -128,13 +151,13 @@ def _raw_face_locations(img, number_of_times_to_upsample=1, model="hog"):
     else:
         return face_detector(img, number_of_times_to_upsample)
 
-"""
+
 def ConvertDetectionsForGeyGuyCode ():
      if model == "cnn":
         return [_trim_css_to_bounds(_rect_to_css(face.rect), img.shape) for face in _raw_face_locations(img, number_of_times_to_upsample, "cnn")]
     else:
         return [_trim_css_to_bounds(_rect_to_css(face), img.shape) for face in _raw_face_locations(img, number_of_times_to_upsample, model)]
-"""
+'''
 ###############################################################################
 
 
@@ -210,18 +233,6 @@ def DrawBox(mat_detections,frame,i,w,h,count):
     return box
 
 
-# OpenCV assumes that right and bottom boundaries are NOT inclusive
-# while Dlib assumes they are
-def OpenCVRectangleToDlibRectangle (box):
-    #mydbrect.top() is equal to startY
-    #mydbrect.left() is equal to startX
-    #mydbrect.right() is equal to endX
-    #mydbrect.bottom() is equal to endY
-    (startX, startY, endX, endY) = box.astype("int")
-    dlibRectangle = dlib.rectangle(startX,startY,endX-1,endY-1)
-
-    return dlibRectangle
-
 
 
 def IterateOverDetectedFaces (mat_detections,frame):
@@ -233,12 +244,31 @@ def IterateOverDetectedFaces (mat_detections,frame):
     
         #convert to dlib.rectangle
         #actually I need to convert to dlib.mmod_rectangles
-        #dlib_rectangle = OpenCVRectangleToDlibRectangle(box)
+        dlib_rectangle = dlibFaceRecognition.OpenCVRectangleToDlibRectangle(box)
+        mmod_singleRectangle.confidence =  mat_detections[0, 0, i, 2]
+        mmod_singleRectangle.rect = dlib_rectangle
+        
+
+        mmod_rects.append(mmod_singleRectangle)
+
+    return mmod_rects
+
+        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+        #small_frame = frame #cv2.resize(frame, (0, 0), fx=1/4, fy=1/4)
+        #rgb_small_frame = small_frame[:, :, ::-1]
+
+        # Find all the face locations and face encodings in the current frame of video
+        #face_locations = face_recognition.face_locations(rgb_small_frame)#,2,"hog")
+        #face_encodings = dlibFaceRecognition.face_recognition.face_encodings(frame, mmod_rectangles)
+        #face_encodings = face_recognition.face_encodings(frame, mmod_rects)
+
+
 
 
 def main():
     print("OpenCV Version: {}".format(cv2.__version__))
     OpenCVUsingCuda()
+    dlibFaceRecognition.load_known_faces()
     CaptureVideo()
 
 if __name__ == "__main__":
