@@ -1,3 +1,6 @@
+# Anel Salas 08/19
+# I've separated the Face recognition from the face detection
+
 import face_recognition
 import cv2
 from datetime import datetime, timedelta
@@ -55,8 +58,8 @@ def GeyGuyFaceEncodings (known_face_locations,img):
     #dlib.rectangle(faceLocs[3], faceLocs[0], faceLocs[1], faceLocs[2])
     face_locations = [dlib.rectangle(faceLocs[3], faceLocs[0], faceLocs[1], faceLocs[2]) for faceLocs in known_face_locations]
     #path = os.getcwd() + "shape_predictor_68_face_landmarks.dat"
-    #raw_face_landmars =  [pose_predictor_68_point(img, face_location) for face_location in face_locations]
-    print("only locations done")
+    raw_face_landmars =  [pose_predictor_68_point(img, face_location) for face_location in face_locations]
+    #print("only locations done")
 
     #raw_landmarks = _raw_face_landmarks(img, known_face_locations)
     #return [np.array(face_qencoder.compute_face_descriptor(face_image, raw_landmark_set, num_jitters)) for raw_landmark_set in raw_landmarks]

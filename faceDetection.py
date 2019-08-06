@@ -32,26 +32,42 @@ From the documentation:
    "You can get the mmod_human_face_detector.dat file from:\n"
    "    http://dlib.net/files/mmod_human_face_detector.dat.bz2"
 '''
-
+'''
 cnn_face_detector = dlib.cnn_face_detection_model_v1("mmod_human_face_detector1.dat")
 img = dlib.load_rgb_image("obama_small.jpg")
 mmod_rects = cnn_face_detector(img,1)
 mmod_singleRectangle = mmod_rects.pop()
 
 dlibFaceRecognition.ClearListOfDetectedFaces (mmod_rects)
+'''
 
 #geyguy face_recognition library globals
 known_face_encodings = []
 knon_face_metadata = []
+usingplatform = ""
+
+def Init ():
+    print("Python version: ", sys.version)
+    print("OpenCV Version: {}".format(cv2.__version__))
+    usingplatform = GetPlatform ()
+    OpenCVUsingCuda()
+
+
+def GetPlatform ():
+    usingplatform = platform.machine();
+    if usingplatform  == "aarch64":
+        print("Platform", usingplatform, "Using Jetson Nano\n")
+    elif usingplatform  == "AMD64":
+        print("Platform: " , usingplatform, "Running on a Windows System")
+    return usingplatform
 
 
 
 def GetVideoObject():
     usingplatform = platform.machine();
-    print(usingplatform)
     video_capture = None
     if usingplatform  == "aarch64":
-        print("Using Jetson Nano\n")
+        #print("Using Jetson Nano\n")
         video_capture = cv2.VideoCapture(0)
         #video_capture = cv2.VideoCapture("http://10.1.10.165:8081", cv2.CAP_GSTREAMER)
         #video_capture.open() # no need to open! it seems capture does that already
@@ -60,7 +76,7 @@ def GetVideoObject():
             sys.exit()
 
     elif usingplatform  == "AMD64": 
-        print("Running on a Windows System")
+        #print("Running on a Windows System")
         video_capture = cv2.VideoCapture(1+cv2.CAP_DSHOW)
         if video_capture.isOpened() !=  True:  
             print("Cannot find camera, quitting")
@@ -96,7 +112,7 @@ def OpenCVUsingCuda():
 def CaptureVideo():
     net_model = ReadModel()
     video_capture = GetVideoObject()
-  
+    process_this_frame = 0
     while True: 
         # process each frame
         ret, frame = video_capture.read()
@@ -104,10 +120,12 @@ def CaptureVideo():
         mat_detections = ExtractDetectedFaces(blob,net_model)
         # for this to work with gey guy face_recognition, I need to return
         # a list of tuples of found face locations in css (top, right, bottom, left) order
-        dlib_mmod_rects = IterateOverDetectedFaces (mat_detections,frame)
-        geyguyFaceLocations = dlibFaceRecognition.GeyGuyFormatedDetectedFaces(dlib_mmod_rects,frame)
-        dlib_face_encodings = dlibFaceRecognition.GeyGuyFaceEncodings(geyguyFaceLocations,frame)
+        #dlib_mmod_rects = IterateOverDetectedFaces (mat_detections,frame)
+        IterateOverDetectedFaces (mat_detections,frame)
+        #geyguyFaceLocations = dlibFaceRecognition.GeyGuyFormatedDetectedFaces(dlib_mmod_rects,frame)
 
+        #if process_this_frame == 7:
+        #    dlib_face_encodings = dlibFaceRecognition.GeyGuyFaceEncodings(geyguyFaceLocations,frame)
 
         #face_encodings = face_recognition.face_encodings(frame, detected_faces)
         # Display frame 
@@ -116,6 +134,9 @@ def CaptureVideo():
         keypressed = 0xFF & cv2.waitKey(1)
         if keypressed == ord('q') or keypressed == ord('Q') :
             break
+        process_this_frame += 1
+        if process_this_frame == 8:
+            process_this_frame = 0
 # The following functions are used by geyguy so I'm putting them as reference
 
 ###############################################################################
@@ -244,14 +265,14 @@ def IterateOverDetectedFaces (mat_detections,frame):
     
         #convert to dlib.rectangle
         #actually I need to convert to dlib.mmod_rectangles
-        dlib_rectangle = dlibFaceRecognition.OpenCVRectangleToDlibRectangle(box)
-        mmod_singleRectangle.confidence =  mat_detections[0, 0, i, 2]
-        mmod_singleRectangle.rect = dlib_rectangle
+        #dlib_rectangle = dlibFaceRecognition.OpenCVRectangleToDlibRectangle(box)
+        #mmod_singleRectangle.confidence =  mat_detections[0, 0, i, 2]
+        #mmod_singleRectangle.rect = dlib_rectangle
         
 
-        mmod_rects.append(mmod_singleRectangle)
+        #mmod_rects.append(mmod_singleRectangle)
 
-    return mmod_rects
+    #return mmod_rects
 
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         #small_frame = frame #cv2.resize(frame, (0, 0), fx=1/4, fy=1/4)
@@ -266,8 +287,7 @@ def IterateOverDetectedFaces (mat_detections,frame):
 
 
 def main():
-    print("OpenCV Version: {}".format(cv2.__version__))
-    OpenCVUsingCuda()
+    Init()
     dlibFaceRecognition.load_known_faces()
     CaptureVideo()
 
