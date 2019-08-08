@@ -67,14 +67,21 @@ def GetVideoObject():
     usingplatform = platform.machine();
     video_capture = None
     if usingplatform  == "aarch64":
-        #print("Using Jetson Nano\n")
-        video_capture = cv2.VideoCapture(0)
+        # to find the device use gst-device-monitor-1.0 and it will list the camera specs, 
+        # from there I grabbed the with and height 
+        # read here: https://gstreamer.freedesktop.org/documentation/tools/gst-launch.html?gi-language=c
+        # also, this dude in github has a gstream python script to open bunch of cameras, but mine is simpler
+        # https://gist.github.com/jkjung-avt/86b60a7723b97da19f7bfa3cb7d2690e#
+        gst_str = ('v4l2src device=/dev/video{} ! '
+               'video/x-raw, width=(int){}, height=(int){} ! '
+               #'videoconvert ! appsink').format(0, 800, 600) # no speed improvement when reduce video size
+               'videoconvert ! appsink').format(0, 1280, 720)
+        video_capture = cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
+        #video_capture = cv2.VideoCapture(0,cv2.CAP_GSTREAMER)
         #video_capture = cv2.VideoCapture("http://10.1.10.165:8081", cv2.CAP_GSTREAMER)
-        #video_capture.open() # no need to open! it seems capture does that already
         if video_capture.isOpened() !=  True:  
             print("Cannot find camera, quitting")
             sys.exit()
-
     elif usingplatform  == "AMD64": 
         #print("Running on a Windows System")
         video_capture = cv2.VideoCapture(1+cv2.CAP_DSHOW)
@@ -89,6 +96,7 @@ def GetVideoObject():
     return video_capture
 
 def DlibUsingCuda():
+    # this checks if CUDA was build with Dlib, but you can also do sudo tegrastats on the nano
     print(cuda.get_num_devices())
     if dlib.DLIB_USE_CUDA:
         print("Successfully using CUDA")
@@ -110,7 +118,7 @@ def OpenCVUsingCuda():
         print("Could Not Find CUDA")
 
 def CaptureVideo():
-    net_model = ReadModel()
+    net_model = ImportPretrainedFaceRecognitionModel()
     video_capture = GetVideoObject()
     process_this_frame = 0
     while True: 
@@ -221,8 +229,12 @@ then pass that to face_recofntion.face_encondings()
                 '''
 """
 
-def ReadModel ():
-    #import the models provided in the OpenCV repository
+def ImportPretrainedFaceRecognitionModel ():
+    #import the pre trained face detection models provided in the OpenCV repository
+    # https://github.com/opencv/opencv/tree/master/samples/dnn/face_detector
+    # the weights have to be downloaded with this script: 
+    # https://github.com/opencv/opencv/blob/master/samples/dnn/face_detector/download_weights.py
+
     net_model = cv2.dnn.readNetFromCaffe('deploy.prototxt', 'weights.caffemodel')
     if net_model is None:
         print("Error getting pre-trained models, Check if weights.caffemodel and deploy.prototxt files exist")
