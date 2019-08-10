@@ -19,6 +19,7 @@ import dlib
 import dlibFaceRecognition
 import pprint
 import face_recognition
+import math
 
 '''
 All these stupid globals are because there is no constructor available for 
@@ -84,7 +85,7 @@ def GetVideoObject():
             sys.exit()
     elif usingplatform  == "AMD64": 
         #print("Running on a Windows System")
-        video_capture = cv2.VideoCapture(1+cv2.CAP_DSHOW)
+        video_capture = cv2.VideoCapture(0)#1+cv2.CAP_DSHOW)
         if video_capture.isOpened() !=  True:  
             print("Cannot find camera, quitting")
             sys.exit()
@@ -130,12 +131,7 @@ def CaptureVideo():
         # a list of tuples of found face locations in css (top, right, bottom, left) order
         #dlib_mmod_rects = IterateOverDetectedFaces (mat_detections,frame)
         IterateOverDetectedFaces (mat_detections,frame)
-        #geyguyFaceLocations = dlibFaceRecognition.GeyGuyFormatedDetectedFaces(dlib_mmod_rects,frame)
 
-        #if process_this_frame == 7:
-        #    dlib_face_encodings = dlibFaceRecognition.GeyGuyFaceEncodings(geyguyFaceLocations,frame)
-
-        #face_encodings = face_recognition.face_encodings(frame, detected_faces)
         # Display frame 
         cv2.imshow('Video', frame)
         # Hit 'q' on the keyboard to quit
@@ -145,50 +141,6 @@ def CaptureVideo():
         process_this_frame += 1
         if process_this_frame == 8:
             process_this_frame = 0
-# The following functions are used by geyguy so I'm putting them as reference
-
-###############################################################################
-'''
-def _rect_to_css(rect):
-    """
-    Convert a dlib 'rect' object to a plain tuple in (top, right, bottom, left) order
-    :param rect: a dlib 'rect' object
-    :return: a plain tuple representation of the rect in (top, right, bottom, left) order
-    """
-    return rect.top(), rect.right(), rect.bottom(), rect.left()
-
-def _trim_css_to_bounds(css, image_shape):
-    """
-    Make sure a tuple in (top, right, bottom, left) order is within the bounds of the image.
-    :param css:  plain tuple representation of the rect in (top, right, bottom, left) order
-    :param image_shape: numpy shape of the image array
-    :return: a trimmed plain tuple representation of the rect in (top, right, bottom, left) order
-    """
-    return max(css[0], 0), min(css[1], image_shape[1]), min(css[2], image_shape[0]), max(css[3], 0)
-
-def _raw_face_locations(img, number_of_times_to_upsample=1, model="hog"):
-    """
-    Returns an array of bounding boxes of human faces in a image
-    :param img: An image (as a numpy array)
-    :param number_of_times_to_upsample: How many times to upsample the image looking for faces. Higher numbers find smaller faces.
-    :param model: Which face detection model to use. "hog" is less accurate but faster on CPUs. "cnn" is a more accurate
-                  deep-learning model which is GPU/CUDA accelerated (if available). The default is "hog".
-    :return: A list of dlib 'rect' objects of found face locations
-    """
-    if model == "cnn":
-        return cnn_face_detector(img, number_of_times_to_upsample)
-    else:
-        return face_detector(img, number_of_times_to_upsample)
-
-
-def ConvertDetectionsForGeyGuyCode ():
-     if model == "cnn":
-        return [_trim_css_to_bounds(_rect_to_css(face.rect), img.shape) for face in _raw_face_locations(img, number_of_times_to_upsample, "cnn")]
-    else:
-        return [_trim_css_to_bounds(_rect_to_css(face), img.shape) for face in _raw_face_locations(img, number_of_times_to_upsample, model)]
-'''
-###############################################################################
-
 
 def GetBlobFromFrame(frame):
     #get our blob which is our input image after mean subtraction, normalizing, and channel swapping
@@ -200,34 +152,6 @@ def ExtractDetectedFaces (blob,net_model):
     net_model.setInput(blob)
     mat_detections = net_model.forward()
     return mat_detections
-
-# TODO:
-"""
-What I need to do is to be able to return the same that face_recognition.face_locatinos(rgb_small_frame) returns
-then pass that to face_recofntion.face_encondings()
-        # Find all the face locations and face encodings in the current frame of video
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-        face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
-
-        face_recognition.face_locations() does this:
-            return [_trim_css_to_bounds(_rect_to_css(face.rect), img.shape) for face in _raw_face_locations(img, number_of_times_to_upsample, "cnn")]
-
-            and _raw_face_locations() does this:
-
-            cnn_face_detector(img, number_of_times_to_upsample)
-                '''
-                This detector returns a mmod_rectangles object. This object contains a list of mmod_rectangle objects.
-                These objects can be accessed by simply iterating over the mmod_rectangles object
-                The mmod_rectangle object has two member variables, a dlib.rectangle object, and a confidence score.
-                Sooo: mmod_rectangle = [dlib.rectangle, confidencescore]
-                
-                It is also possible to pass a list of images to the detector.
-                    - like this: dets = cnn_face_detector([image list], upsample_num, batch_size = 128)
-            
-                In this case it will return a mmod_rectangless object.
-                This object behaves just like a list of lists and can be iterated over.
-                '''
-"""
 
 def ImportPretrainedFaceRecognitionModel ():
     #import the pre trained face detection models provided in the OpenCV repository
@@ -246,57 +170,50 @@ def ReleaseResources (video_capture):
     video_capture.release()
     cv2.destroyAllWindows()
 
-def DrawBox(mat_detections,frame,i,w,h,count):        
+def GetNewHeightMaintainRatio (desiredWidth,startX,endX,startY,endY):
+    faceHeight = int(endY - startY)
+    faceWidth = int(endX - startX)
+    faceAspectRatio = faceWidth / faceHeight
+    newHeight = int(desiredWidth/faceAspectRatio)
+    return newHeight
+
+def DrawBox(mat_detections,frame,i,count):
+    (h,w) = frame.shape[:2];
     box = mat_detections[0, 0, i, 3:7] * numpy.array([w, h, w, h])
     (startX, startY, endX, endY) = box.astype("int")
 
     confidence = mat_detections[0, 0, i, 2]
     #only draw box if confidence > 16.5
     #original algo checked on 165 but works better at 30% in my tests
-    if (confidence > 0.17):
-        mydbrect = dlib.rectangle(startX,startY,endX-1,endY-1)
+    if (confidence > 0.5):
         cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 0, 0), 2)
-        #cv2.rectangle(frame, (startX, startY - 35), (endX, endY), (0, 0, 255), cv2.FILLED)
-        #face = 'face : {0}, {1}, {2}, {3}, {4}'.format(  startX, mydbrect.bottom(), startY, endX, endY  )
-        face = 'confidence : {0:.{1}}'.format(  confidence, 3 )
-        cv2.putText(frame, face , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
-        count = count + 1
-        #frame[30:180, startX:startX + 150,startY] = box^M
+        facestr = 'Conf: {0:.{1}},Faces: {2}, pos:{3}'.format(  confidence,2, count,startX)
 
+        cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
+        #Draw the detected face
+        newWidth = 75
+        newHeight = GetNewHeightMaintainRatio (newWidth,startX,endX,startY,endY)#int(newWidth/faceAspectRatio)
+
+        face_image = frame[startY:endY, startX:endX] 
+
+        if count == 1:
+            xPos = 0
+        else:
+            xPos = (count-1)*newWidth
+
+        if face_image.any() and count > 0:
+            face_image = cv2.resize(face_image, (newWidth, newHeight))
+            frame[30:newHeight+30, xPos:xPos + newWidth] = face_image
     return box
 
-
-
-
 def IterateOverDetectedFaces (mat_detections,frame):
-    # extract their start and end points
     count = 0
-    (h,w) = frame.shape[:2];
     for i in range(0, mat_detections.shape[2]):
-        box = DrawBox(mat_detections,frame,i,w,h,count)
-    
-        #convert to dlib.rectangle
-        #actually I need to convert to dlib.mmod_rectangles
-        #dlib_rectangle = dlibFaceRecognition.OpenCVRectangleToDlibRectangle(box)
-        #mmod_singleRectangle.confidence =  mat_detections[0, 0, i, 2]
-        #mmod_singleRectangle.rect = dlib_rectangle
-        
-
-        #mmod_rects.append(mmod_singleRectangle)
-
-    #return mmod_rects
-
-        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        #small_frame = frame #cv2.resize(frame, (0, 0), fx=1/4, fy=1/4)
-        #rgb_small_frame = small_frame[:, :, ::-1]
-
-        # Find all the face locations and face encodings in the current frame of video
-        #face_locations = face_recognition.face_locations(rgb_small_frame)#,2,"hog")
-        #face_encodings = dlibFaceRecognition.face_recognition.face_encodings(frame, mmod_rectangles)
-        #face_encodings = face_recognition.face_encodings(frame, mmod_rects)
-
-
-
+        # only grab faces with 60% confidence or more
+        if mat_detections[0, 0, i, 2] > 0.6:
+            count +=1
+            box = DrawBox(mat_detections,frame,i,count)
+            #send face to face recog engine
 
 def main():
     Init()
