@@ -18,7 +18,7 @@ import platform
 import dlib
 import dlibFaceRecognition
 import pprint
-import face_recognition
+import FaceRecognitionUtils as fr
 import math
 
 '''
@@ -47,12 +47,13 @@ known_face_encodings = []
 knon_face_metadata = []
 usingplatform = ""
 
+embedder = fr.LoadFaceRecognizerModel()
+
 def Init ():
     print("Python version: ", sys.version)
     print("OpenCV Version: {}".format(cv2.__version__))
     usingplatform = GetPlatform ()
     OpenCVUsingCuda()
-
 
 def GetPlatform ():
     usingplatform = platform.machine();
@@ -61,8 +62,6 @@ def GetPlatform ():
     elif usingplatform  == "AMD64":
         print("Platform: " , usingplatform, "Running on a Windows System")
     return usingplatform
-
-
 
 def GetVideoObject():
     usingplatform = platform.machine();
@@ -119,13 +118,16 @@ def OpenCVUsingCuda():
         print("Could Not Find CUDA")
 
 def CaptureVideo():
-    net_model = ImportPretrainedFaceRecognitionModel()
+    net_model = LoadPretrainedFaceRecognitionModel()
     video_capture = GetVideoObject()
     process_this_frame = 0
     while True: 
         # process each frame
         ret, frame = video_capture.read()
         blob = GetBlobFromFrame(frame)
+
+        # The detections  list contains probabilities and coordinates 
+        # to localize faces in an image.
         mat_detections = ExtractDetectedFaces(blob,net_model)
         # for this to work with gey guy face_recognition, I need to return
         # a list of tuples of found face locations in css (top, right, bottom, left) order
@@ -153,13 +155,14 @@ def ExtractDetectedFaces (blob,net_model):
     mat_detections = net_model.forward()
     return mat_detections
 
-def ImportPretrainedFaceRecognitionModel ():
+def LoadPretrainedFaceRecognitionModel ():
     #import the pre trained face detection models provided in the OpenCV repository
     # https://github.com/opencv/opencv/tree/master/samples/dnn/face_detector
     # the weights have to be downloaded with this script: 
     # https://github.com/opencv/opencv/blob/master/samples/dnn/face_detector/download_weights.py
-
-    net_model = cv2.dnn.readNetFromCaffe('deploy.prototxt', 'weights.caffemodel')
+    print("Loading face detection deep neural network model ...")
+    
+    net_model = cv2.dnn.readNetFromCaffe('models/facedetection-deploy.prototxt', 'models/facedetection-weights.caffemodel')
     if net_model is None:
         print("Error getting pre-trained models, Check if weights.caffemodel and deploy.prototxt files exist")
         sys.exit()
@@ -183,34 +186,37 @@ def DrawBox(mat_detections,frame,i,count):
     (startX, startY, endX, endY) = box.astype("int")
 
     confidence = mat_detections[0, 0, i, 2]
-    #only draw box if confidence > 16.5
-    #original algo checked on 165 but works better at 30% in my tests
-    if (confidence > 0.5):
-        cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 0, 0), 2)
-        facestr = 'Conf: {0:.{1}},Faces: {2}, pos:{3}'.format(  confidence,2, count,startX)
 
-        cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
-        #Draw the detected face
-        newWidth = 75
-        newHeight = GetNewHeightMaintainRatio (newWidth,startX,endX,startY,endY)#int(newWidth/faceAspectRatio)
+    cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 0, 0), 2)
+    facestr = 'Conf: {0:.{1}},Faces: {2}, pos:{3}'.format(  confidence,2, count,startX)
 
-        face_image = frame[startY:endY, startX:endX] 
+    cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
+    #Draw the detected face
+    newWidth = 100
+    newHeight = GetNewHeightMaintainRatio (newWidth,startX,endX,startY,endY)#int(newWidth/faceAspectRatio)
 
-        if count == 1:
-            xPos = 0
-        else:
-            xPos = (count-1)*newWidth
+    face_image = frame[startY:endY, startX:endX] 
 
-        if face_image.any() and count > 0:
-            face_image = cv2.resize(face_image, (newWidth, newHeight))
-            frame[30:newHeight+30, xPos:xPos + newWidth] = face_image
+    if count == 1:
+        xPos = 0
+    else:
+        xPos = (count-1)*newWidth
+
+    if face_image.any() and count > 0:
+        face_image = cv2.resize(face_image, (newWidth, newHeight))
+        frame[30:newHeight+30, xPos:xPos + newWidth] = face_image
+        // Some images have no size and create an error
+        // so make sure you run the embedding after a resizing.
+        qembeddingVector = fr.CreateFaceEmbedding (face_image,embedder)
+
+
     return box
 
 def IterateOverDetectedFaces (mat_detections,frame):
     count = 0
     for i in range(0, mat_detections.shape[2]):
         # only grab faces with 60% confidence or more
-        if mat_detections[0, 0, i, 2] > 0.6:
+        if mat_detections[0, 0, i, 2] > 0.4:
             count +=1
             box = DrawBox(mat_detections,frame,i,count)
             #send face to face recog engine
