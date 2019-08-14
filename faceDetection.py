@@ -5,7 +5,7 @@
 # GPUs. It is better than the face_recognition module from Dlib Geitgey
 # only because it recognizes faces smaller than 80x80px.
 
-# TODO: Compare the capture image with known faces
+
 
 
 #import libraries
@@ -84,7 +84,9 @@ def GetVideoObject():
             sys.exit()
     elif usingplatform  == "AMD64": 
         #print("Running on a Windows System")
-        video_capture = cv2.VideoCapture(0)#1+cv2.CAP_DSHOW)
+        #video_capture = cv2.VideoCapture(0+cv2.CAP_DSHOW)
+        #video_capture = cv2.VideoCapture(1+cv2.CAP_DSHOW)
+        video_capture = cv2.VideoCapture(1+cv2.CAP_DSHOW)
         if video_capture.isOpened() !=  True:  
             print("Cannot find camera, quitting")
             sys.exit()
@@ -124,6 +126,9 @@ def CaptureVideo():
     while True: 
         # process each frame
         ret, frame = video_capture.read()
+        if ret == False:
+            continue
+
         blob = GetBlobFromFrame(frame)
 
         # The detections  list contains probabilities and coordinates 
@@ -190,9 +195,9 @@ def DrawBox(mat_detections,frame,i,count):
     cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 0, 0), 2)
     facestr = 'Conf: {0:.{1}},Faces: {2}, pos:{3}'.format(  confidence,2, count,startX)
 
-    cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
+    cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
     #Draw the detected face
-    newWidth = 100
+    newWidth = 96
     newHeight = GetNewHeightMaintainRatio (newWidth,startX,endX,startY,endY)#int(newWidth/faceAspectRatio)
 
     face_image = frame[startY:endY, startX:endX] 
@@ -205,12 +210,12 @@ def DrawBox(mat_detections,frame,i,count):
     if face_image.any() and count > 0:
         face_image = cv2.resize(face_image, (newWidth, newHeight))
         frame[30:newHeight+30, xPos:xPos + newWidth] = face_image
-        // Some images have no size and create an error
-        // so make sure you run the embedding after a resizing.
-        qembeddingVector = fr.CreateFaceEmbedding (face_image,embedder)
+        # Some images have no size and create an error
+        # so make sure you run the embedding after a resizing.
+        #qembeddingVector = fr.CreateFaceEmbedding (face_image,embedder)
 
 
-    return box
+    return face_image
 
 def IterateOverDetectedFaces (mat_detections,frame):
     count = 0
@@ -218,8 +223,9 @@ def IterateOverDetectedFaces (mat_detections,frame):
         # only grab faces with 60% confidence or more
         if mat_detections[0, 0, i, 2] > 0.4:
             count +=1
-            box = DrawBox(mat_detections,frame,i,count)
+            face_box = DrawBox(mat_detections,frame,i,count)
             #send face to face recog engine
+            vec = fr.CreateFaceEmbedding (face_box,embedder)
 
 def main():
     Init()

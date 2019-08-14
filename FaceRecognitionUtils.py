@@ -1,3 +1,29 @@
+# Anel Salas 08/19
+# Requires pip install scikit-learn 
+# scikit-learn requires scipy
+# to install first make sure you run python 3 pip
+# $ curl -O https://bootstrap.pypa.io/get-pip.py
+# $ sudo python3 get-pip.py
+# didn't work pip3 install scikit-learn
+# didn't work error was that python3 -m pip install --no-binary spacy
+# PEP 517 for wheels was not installed so could not build scipy or scikit-learn
+
+
+
+########### for the Nano on Linux###########
+# so I went the anaconda route: downloaaded the jetson dockerfile and grabed the scrip
+# that installed anaconda for the nano: archiconda3.sh and ran it:
+# sudo sh archiconda.sh -b -p /opt/archiconda3
+# now runnig conda3 install 
+# sudo /opt/archiconda3/bin/conda install scikit-learn
+############################################
+
+########### for Microsucks Windows #########
+# on windows what worked was py -m pip install scikit-learn
+############################################
+
+
+
 # import the necessary packages
 #from imutils import paths
 import numpy as np
@@ -11,11 +37,11 @@ import os
 def LoadFaceRecognizerModel ():
     # The models can be downloaded from the OpenFace project here:
     # http://cmusatyalab.github.io/openface/models-and-accuracies/
-
     #return cv2.dnn.readNetFromTorch("models/faceRecognition-nn4.v2.t7")
     #return cv2.dnn.readNetFromTorch("models/faceRecognition-nn4.small2.v1.t7")
     print("Loading face recognizer deep neural network model ...")
-    return cv2.dnn.readNetFromTorch("models/OpenFace-nn4.small2.v1.t7")
+    embedder = cv2.dnn.readNetFromTorch("models/OpenFace-nn4.small2.v1.t7")
+    return embedder
 
 def CreateBlobFromFaceImage (face):
     """
@@ -39,7 +65,7 @@ def CreateBlobFromFaceImage (face):
         (96, 96), (0, 0, 0), swapRB=True, crop=False)
     """
     # construct a blob for the face ROI only
-    faceBlob = cv2.dnn.blobFromImage(face, 1.0,
+    faceBlob = cv2.dnn.blobFromImage(face,  1.0 / 255,
         (96, 96), (0, 0, 0), swapRB=True, crop=False)
     return faceBlob
 
@@ -56,6 +82,9 @@ def CreateFaceEmbedding (face,embedder):
     embedder.setInput(faceBlob)
     vec = embedder.forward()
     return vec
+
+#def LearnWithScikit ():
+    # reference here: https://scikit-learn.org/stable/about.html#citing-scikit-learn
 
 
 
