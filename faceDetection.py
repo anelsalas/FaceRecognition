@@ -15,11 +15,21 @@ import cv2
 import numpy
 import sys
 import platform
-import dlib
-import dlibFaceRecognition
+#import dlib
+#import dlibFaceRecognition
 import pprint
 import FaceRecognitionUtils as fr
 import math
+import pickle
+
+embedder = fr.LoadFaceRecognizerModel()
+
+# load the actual face recognition model along with the label encoder
+recognizer = pickle.loads(open("recognizer.dat", "rb").read())
+le = pickle.loads(open("labelencoder.dat", "rb").read())
+
+tracker =  cv2.TrackerMOSSE_create()
+trackingBoundingBox = None
 
 '''
 All these stupid globals are because there is no constructor available for 
@@ -47,13 +57,15 @@ known_face_encodings = []
 knon_face_metadata = []
 usingplatform = ""
 
-embedder = fr.LoadFaceRecognizerModel()
+
+
 
 def Init ():
     print("Python version: ", sys.version)
     print("OpenCV Version: {}".format(cv2.__version__))
     usingplatform = GetPlatform ()
     OpenCVUsingCuda()
+
 
 def GetPlatform ():
     usingplatform = platform.machine();
@@ -134,6 +146,19 @@ def CaptureVideo():
         # The detections  list contains probabilities and coordinates 
         # to localize faces in an image.
         mat_detections = ExtractDetectedFaces(blob,net_model)
+
+        '''
+        #track it
+        if mat_detections is not None:
+            (h,w) = frame.shape[:2];
+            box = mat_detections[0, 0, 0, 3:7] * numpy.array([w, h, w, h])
+            (startX, startY, endX, endY) = box.astype("int")
+            #trackingBoundingBox is a 2d rectangle like this: (xmin,ymin,boxwidth,boxheight)
+            trackingBoundingBox = (startX,startY,endX-startY,endY-startY)
+            #trackingBoundingBox = frame[startY:endY, startX:endX]
+            tracker.init(frame, trackingBoundingBox)
+        '''
+
         # for this to work with gey guy face_recognition, I need to return
         # a list of tuples of found face locations in css (top, right, bottom, left) order
         #dlib_mmod_rects = IterateOverDetectedFaces (mat_detections,frame)
@@ -195,7 +220,7 @@ def DrawBox(mat_detections,frame,i,count):
     cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 0, 0), 2)
     facestr = 'Conf: {0:.{1}},Faces: {2}, pos:{3}'.format(  confidence,2, count,startX)
 
-    cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+    #cv2.putText(frame, facestr , (startX + 6, startY - 6), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
     #Draw the detected face
     newWidth = 96
     newHeight = GetNewHeightMaintainRatio (newWidth,startX,endX,startY,endY)#int(newWidth/faceAspectRatio)
@@ -214,6 +239,24 @@ def DrawBox(mat_detections,frame,i,count):
         # so make sure you run the embedding after a resizing.
         #qembeddingVector = fr.CreateFaceEmbedding (face_image,embedder)
 
+        #send face to face recog engine
+        vec = fr.CreateFaceEmbedding (face_image,embedder)
+        vec = embedder.forward()
+        # perform classification to recognize the face
+        preds = recognizer.predict_proba(vec)[0]
+        j = numpy.argmax(preds)
+        proba = preds[j]
+        name = le.classes_[j]
+        if proba > 0.70:
+
+            # draw the bounding box of the face along with the
+            # associated probability
+            text = "{}: {:.2f}%".format(name, proba * 100)
+            y = startY - 10 if startY - 10 > 10 else startY + 10
+            cv2.rectangle(frame, (startX, startY), (endX, endY),
+                (0, 0, 255), 2)
+            cv2.putText(frame, text, (startX, y),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
     return face_image
 
@@ -221,15 +264,15 @@ def IterateOverDetectedFaces (mat_detections,frame):
     count = 0
     for i in range(0, mat_detections.shape[2]):
         # only grab faces with 60% confidence or more
-        if mat_detections[0, 0, i, 2] > 0.4:
+        if mat_detections[0, 0, i, 2] > 0.6:
             count +=1
             face_box = DrawBox(mat_detections,frame,i,count)
-            #send face to face recog engine
-            vec = fr.CreateFaceEmbedding (face_box,embedder)
+
 
 def main():
+
+
     Init()
-    dlibFaceRecognition.load_known_faces()
     CaptureVideo()
 
 if __name__ == "__main__":

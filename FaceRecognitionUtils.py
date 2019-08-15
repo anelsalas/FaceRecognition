@@ -10,7 +10,7 @@
 
 
 
-########### for the Nano on Linux###########
+########### scikit-learn for the Nano on Linux###########
 # so I went the anaconda route: downloaaded the jetson dockerfile and grabed the scrip
 # that installed anaconda for the nano: archiconda3.sh and ran it:
 # sudo sh archiconda.sh -b -p /opt/archiconda3
@@ -18,8 +18,9 @@
 # sudo /opt/archiconda3/bin/conda install scikit-learn
 ############################################
 
-########### for Microsucks Windows #########
+########### scikit-learn for Microsucks Windows #########
 # on windows what worked was py -m pip install scikit-learn
+# also py -m pip install opencv-contrib-python
 ############################################
 
 
