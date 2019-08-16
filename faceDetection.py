@@ -28,7 +28,8 @@ embedder = fr.LoadFaceRecognizerModel()
 recognizer = pickle.loads(open("recognizer.dat", "rb").read())
 le = pickle.loads(open("labelencoder.dat", "rb").read())
 
-tracker =  cv2.TrackerMOSSE_create()
+#tracker =  cv2.TrackerMOSSE_create()
+tracker =  cv2.TrackerCSRT_create()
 trackingBoundingBox = None
 
 '''
@@ -58,7 +59,27 @@ knon_face_metadata = []
 usingplatform = ""
 
 
+# created a class for the tracker 
+# becase it wasn't been destroyd automagically by 
+# OpenCV python's embeddings
+# this will definetly bring issues because I'm now constructing
+# a new fucking object every time I do recognition
+class myTracker(object):
+    mtracker =  None
+    trackingBoundingBox = (0,0,0,0)
 
+    def __init__(self):
+        self.mtracker = cv2.TrackerCSRT_create()
+        self.trackingBoundingBox = (0,0,0,0)
+    def start (self,frame):
+        self.mtracker.init(frame,self.trackingBoundingBox)
+    def update (self,frame):
+        return self.mtracker.update(frame)
+
+def make_myTracker(startX,startY,endX,endY):
+    tracker = myTracker()
+    tracker.trackingBoundingBox=(startX,startY,endX-startX,endY-startY)
+    return tracker
 
 def Init ():
     print("Python version: ", sys.version)
@@ -131,10 +152,36 @@ def OpenCVUsingCuda():
     if foundSomething == 0:
         print("Could Not Find CUDA")
 
+def TrackFace (mat_detections,frame,trackingBoundingBox):
+#track it
+    if mat_detections is not None:
+        (h,w) = frame.shape[:2];
+        box = mat_detections[0, 0, 0, 3:7] * numpy.array([w, h, w, h])
+        (startX, startY, endX, endY) = box.astype("int")
+        #trackingBoundingBox is a 2d rectangle like this: (xmin,ymin,boxwidth,boxheight)
+        trackingBoundingBox = (startX,startY,endX-startX,endY-startY)
+    
+        # grab the new bounding box coordinates of the object
+        (success, box) = tracker.update(frame)
+        # check to see if the tracking was a success
+        if success:
+           (x, y, w, h) = [int(v) for v in box]
+           cv2.rectangle(frame, (x, y), (x + w, y + h),
+           (0, 255, 0), 2)
+
 def CaptureVideo():
     net_model = LoadPretrainedFaceRecognitionModel()
     video_capture = GetVideoObject()
     process_this_frame = 0
+    trackingBoundingBox = None
+    trackerReady = False
+    box = None
+    trackerr = None
+    success= None
+    name = ""
+    #trackerr = make_myTracker(0,0,0,0)
+
+
     while True: 
         # process each frame
         ret, frame = video_capture.read()
@@ -142,22 +189,74 @@ def CaptureVideo():
             continue
 
         blob = GetBlobFromFrame(frame)
+        if process_this_frame == 24:
+            process_this_frame = 0
 
-        # The detections  list contains probabilities and coordinates 
-        # to localize faces in an image.
-        mat_detections = ExtractDetectedFaces(blob,net_model)
+        if process_this_frame == 0 :
+            trackingBoundingBox = None
+            box = None
 
-        '''
-        #track it
-        if mat_detections is not None:
-            (h,w) = frame.shape[:2];
-            box = mat_detections[0, 0, 0, 3:7] * numpy.array([w, h, w, h])
-            (startX, startY, endX, endY) = box.astype("int")
-            #trackingBoundingBox is a 2d rectangle like this: (xmin,ymin,boxwidth,boxheight)
-            trackingBoundingBox = (startX,startY,endX-startY,endY-startY)
-            #trackingBoundingBox = frame[startY:endY, startX:endX]
-            tracker.init(frame, trackingBoundingBox)
-        '''
+            mat_detections = ExtractDetectedFaces(blob,net_model)
+        
+            if mat_detections[0, 0, 0, 2] > 0.7 :
+                (h,w) = frame.shape[:2];
+                box = mat_detections[0, 0, 0, 3:7] * numpy.array([w, h, w, h])
+                (startX, startY, endX, endY) = box.astype("int")
+                # draw square around detected
+                cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 0, 0), 2)
+
+                #trackingBoundingBox = frame[startY:endY, startX:endX]
+                # renew box to track after every new detection
+                #trackingBoundingBox is a 2d rectangle like this: (xmin,ymin,boxwidth,boxheight)
+                #trackingBoundingBox = (startX,startY,endX-startX,endY-startY)
+                trackerr = make_myTracker(startX,startY,endX,endY)
+                
+                #trackingBoundingBox = (startX,startY,endX,endY)
+                trackerr.start(frame)
+
+
+                #trackingBoundingBox = frame[startY:endY, startX:endX]
+                #tracker.init(frame, trackingBoundingBox)
+                faceIm,name = DrawBox(mat_detections,frame,0,1)
+
+        process_this_frame += 1
+         
+        # always attempt to track 
+        if trackerr is not None:
+            (success, trackingBoundingBox) = trackerr.update(frame)
+        # check to see if the tracking was a success
+        if success:
+           process_this_frame += 1
+           (x, y, w, h) = [int(v) for v in trackingBoundingBox]
+           cv2.rectangle(frame, (x-1, y), (x + w, y + h),(0, 255, 0), 2)
+           cv2.putText(frame,name,(x,y),cv2.FONT_HERSHEY_SIMPLEX,0.45,(0,255,0),2)
+
+        # Display frame 
+        cv2.imshow('Video', frame)
+        # Hit 'q' on the keyboard to quit
+        keypressed = 0xFF & cv2.waitKey(1)
+        if keypressed == ord('q') or keypressed == ord('Q') :
+           break
+
+        continue;
+
+
+
+
+
+        #else:
+             #trackingBoundingBox = None
+        # Display frame 
+        cv2.imshow('Video', frame)
+        # Hit 'q' on the keyboard to quit
+        keypressed = 0xFF & cv2.waitKey(1)
+        if keypressed == ord('q') or keypressed == ord('Q') :
+            break
+
+        continue
+
+
+
 
         # for this to work with gey guy face_recognition, I need to return
         # a list of tuples of found face locations in css (top, right, bottom, left) order
@@ -258,7 +357,7 @@ def DrawBox(mat_detections,frame,i,count):
             cv2.putText(frame, text, (startX, y),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
-    return face_image
+    return face_image,name
 
 def IterateOverDetectedFaces (mat_detections,frame):
     count = 0
