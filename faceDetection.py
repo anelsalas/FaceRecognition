@@ -155,7 +155,7 @@ def main():
             continue
 
         blob = GetBlobFromFrame(frame)
-        if process_this_frame >= 16:
+        if process_this_frame >= 32:
             process_this_frame = 0
 
         if process_this_frame == 0 :
@@ -166,8 +166,8 @@ def main():
             mat_detections = ExtractDetectedFaces(blob,net_model)
             for i in range(0, mat_detections.shape[2]):
                 # only grab faces >60% detected confidence
-                if mat_detections[0, 0, i, 2] > 0.6:
-                    (h,w) = frame.shape[:2];
+                if mat_detections[0, 0, i, 2] > 0.4:
+                    (h,w) = frame.shape[:2]
                     box = mat_detections[0, 0, i, 3:7] * numpy.array([w, h, w, h])
                     (startX, startY, endX, endY) = box.astype("int")
                     confidence = mat_detections[0, 0, i, 2]
@@ -192,12 +192,18 @@ def main():
             (success, trackingBoundingBox) = trackerr.update(frame)
             # check to see if the tracking was a success
             if success:
+               just_the_face = FaceAligner.resize(just_the_face, width=100)
+               (mh,mw) = just_the_face.shape[:2]
+
                process_this_frame += 1
-               text = "{}: {:.2f}% item:{}".format(name, proba * 100,item)
+               #text = "{}: {:.2f}% item:{},mh:{},mw:{}".format(name, proba * 100,item,mh,mw)
+               text = "{}: {:.2f}% ".format(name, proba * 100)
                (x, y, w, h) = [int(v) for v in trackingBoundingBox]
                cv2.rectangle(frame, (x-1, y), (x + w, y + h),(0, 255, 0), 2)
                cv2.putText(frame,text,(x,y-1),cv2.FONT_HERSHEY_SIMPLEX,0.45,(0,255,0),2)
-               #frame[30:newHeight+30, xPos:xPos + newWidth] = just_the_face
+               
+               frame[30:mh+30, mw*item:mw*item+mw] = just_the_face
+               cv2.putText(frame,name,(mw*item,25),cv2.FONT_HERSHEY_SIMPLEX,0.40,(150,0,200),2)
 
         # Display frame 
         cv2.imshow('Video', frame)
@@ -207,6 +213,8 @@ def main():
            break
 
         continue;
+
+        ReleaseResources (video_capture)
 
 
 if __name__ == "__main__":

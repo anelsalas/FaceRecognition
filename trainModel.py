@@ -1,6 +1,6 @@
 # Anel Salas 08/14/19
 ########### scikit-learn for the Nano on Linux###########
-# so I went the anaconda route: downloaaded the jetson dockerfile and grabed the scrip
+# so I went the anaconda route: downloaaded the jetson dockerfile and grabed the script
 # that installed anaconda for the nano: archiconda3.sh and ran it:
 # sudo sh archiconda.sh -b -p /opt/archiconda3
 # now runnig conda3 install 
