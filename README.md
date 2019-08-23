@@ -18,7 +18,7 @@ sudo sh archiconda.sh -b -p /opt/archiconda3
  
  conda info --envs
  
- source activate py3k
+ source activate py37
  
  then install opencv through the sh script
  
