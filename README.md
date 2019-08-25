@@ -8,7 +8,7 @@ Mainly I’ve created 4 main classes into a simple pipeline that allows me to te
 ## FART
 The FART modules are separated into files and instantiated as needed inside FaceDetection.py (Face Detection will be moved to its own file soon)
 
-Face detection: Runs on every an OpenCV Ai algorithm for face detection.
+Face detection: Runs on every frame. It’s an OpenCV Ai algorithm for face detection.
 
 Align: Runing only every 16 frames, this algorithm is used to improve recognition. The DLib Ai algorithm is based on the 1millisecond alignment algorithm published on 2014(https://www.semanticscholar.org/paper/One-millisecond-face-alignment-with-an-ensemble-of-Kazemi-Sullivan/1824b1ccace464ba275ccc86619feaa89018c0ad) 
 
